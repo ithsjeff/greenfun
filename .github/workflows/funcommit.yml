@@ -24,8 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TZ: 'Asia/Phnom_Penh'
+      # The GitHub CLI needs your token to authenticate API calls
+      GH_TOKEN: ${{ secrets.PAT_TOKEN }}
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout Repository
@@ -36,9 +39,8 @@ jobs:
 
       - name: Generate Commits
         run: |
-          # 1. Simulate a 'Day Off' (20% chance to skip)
+          # 1. Simulate a 'Day Off'
           FORCE_RUN="${{ github.event.inputs.skip_day_off }}"
-          
           if [[ "$FORCE_RUN" != "true" ]]; then
             if [[ -z "${{ github.event.inputs.commit_count }}" && -z "${{ github.event.inputs.backdate }}" ]]; then
               if (( RANDOM % 5 == 0 )); then
@@ -53,45 +55,54 @@ jobs:
           # 2. Setup Identity
           git config --local user.email "iths003.hsgroup@gmail.com"
           git config --local user.name "ithsjeff"
+          DEFAULT_BRANCH=${{ github.ref_name }}
 
           # 3. Determine Iteration Count
           INPUT_VAL="${{ github.event.inputs.commit_count }}"
           if [ -z "$INPUT_VAL" ]; then
             ITERATIONS=$(( ( RANDOM % 3 )  + 1 ))
-            echo "Scheduled run: Picking $ITERATIONS commits."
           else
             ITERATIONS=$INPUT_VAL
-            echo "Manual run: Executing $ITERATIONS commits."
           fi
           
-          # 4. Setup Time Travel (Backdating)
+          # 4. Setup Time Travel
           BACKDATE="${{ github.event.inputs.backdate }}"
           if [ -n "$BACKDATE" ]; then
             export GIT_AUTHOR_DATE="$BACKDATE"
             export GIT_COMMITTER_DATE="$BACKDATE"
-            echo "Time travel engaged! Committing at $BACKDATE"
           fi
 
-          # 5. Initialize Streak Counter
+          # 5. Initialize Streak
           if [ ! -f .bot_streak ]; then echo 0 > .bot_streak; fi
           STREAK=$(cat .bot_streak)
+          
+          # 6. Setup Language & Branch Spoofing
+          SPOOF_TARGETS=(
+            "Golang:go:engine/core.go"
+            "Rust:rs:src/memory.rs"
+            "Python:py:scripts/ml_pipeline.py"
+            "JavaScript:js:ui/app.js"
+          )
+          RANDOM_TARGET="${SPOOF_TARGETS[$RANDOM % ${#SPOOF_TARGETS[@]}]}"
+          LANG_NAME=$(echo "$RANDOM_TARGET" | cut -d: -f1)
+          FILE_PATH=$(echo "$RANDOM_TARGET" | cut -d: -f3)
+          
+          SAFE_TIME=$(date +'%s')
+          BRANCH_NAME="feature/${LANG_NAME,,}-update-$SAFE_TIME"
+          
+          git checkout -b "$BRANCH_NAME"
 
-          # 6. Execution Loop
+          # 7. Execution Loop
           for ((i=1; i<=ITERATIONS; i++))
           do
             sleep 2
-            
-            # Increment streak
             STREAK=$((STREAK + 1))
             echo $STREAK > .bot_streak
-            
             TIMESTAMP=$(date +'%Y-%m-%dT%H:%M:%S %Z')
             
-            # Fetch APIs with retries
             JOKE=$(curl -sfSL -m 10 --retry 3 "https://v2.jokeapi.dev/joke/Programming?format=txt&type=single" || echo "Code is like humor. When you have to explain it, it’s bad.")
             FACT=$(curl -sfSL -m 10 --retry 3 "https://uselessfacts.jsph.pl/api/v2/facts/random" | jq -r '.text' || echo "The server forgot its fun fact for today.")
             
-            # Fetch Daily Chess Puzzle
             PUZZLE_RES=$(curl -sfSL -m 10 --retry 3 "https://lichess.org/api/puzzle/daily" || echo "")
             PUZZLE_ID=$(echo "$PUZZLE_RES" | jq -r '.puzzle.id // empty')
             if [ -n "$PUZZLE_ID" ]; then
@@ -100,7 +111,9 @@ jobs:
               PUZZLE_TEXT="Checkmate. API unavailable."
             fi
             
-            # Append everything to the log safely without breaking YAML
+            mkdir -p "$(dirname "$FILE_PATH")"
+            echo "// Auto-sync $TIMESTAMP" >> "$FILE_PATH"
+            
             echo "### 🤖 Auto-Commit Log #$STREAK" >> BOT_ACTIVITY.md
             echo "*📅 $TIMESTAMP*" >> BOT_ACTIVITY.md
             echo "" >> BOT_ACTIVITY.md
@@ -113,17 +126,24 @@ jobs:
             echo "***" >> BOT_ACTIVITY.md
             echo "" >> BOT_ACTIVITY.md
             
-            # Log Rotation: Keep only the last 300 lines
             tail -n 300 BOT_ACTIVITY.md > temp_log.md && mv temp_log.md BOT_ACTIVITY.md
             
-            # Stage both files
-            git add BOT_ACTIVITY.md .bot_streak
+            git add BOT_ACTIVITY.md .bot_streak "$FILE_PATH"
             
-            # Fetch random commit message securely
             API_MSG=$(curl -sfSL -m 10 --retry 3 "https://whatthecommit.com/index.txt" || echo "chore(bot): doing bot things")
-            
             git commit -m "bot: $API_MSG"
           done
 
-      - name: Push changes
-        run: git push origin ${{ github.ref_name }}
+          # 8. GitHub CLI Pull Request Strategy
+          # Push the new feature branch up to GitHub first
+          git push -u origin "$BRANCH_NAME"
+          
+          # Create the Pull Request using gh CLI
+          gh pr create \
+            --title "✨ feat: $LANG_NAME integration updates" \
+            --body "Automated daily sync and puzzle generation for $LANG_NAME. Review streak: **$STREAK**" \
+            --head "$BRANCH_NAME" \
+            --base "$DEFAULT_BRANCH"
+          
+          # Instantly merge the PR and auto-delete the remote branch to keep the repo clean
+          gh pr merge "$BRANCH_NAME" --merge --delete-branch
