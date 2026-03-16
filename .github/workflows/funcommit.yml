@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TZ: 'Asia/Phnom_Penh'
-      # The GitHub CLI needs your token to authenticate API calls
       GH_TOKEN: ${{ secrets.PAT_TOKEN }}
     permissions:
       contents: write
@@ -76,19 +75,31 @@ jobs:
           if [ ! -f .bot_streak ]; then echo 0 > .bot_streak; fi
           STREAK=$(cat .bot_streak)
           
-          # 6. Setup Language & Branch Spoofing
+          # 6. Setup Language & Branch Spoofing (EXPANDED LIST)
           SPOOF_TARGETS=(
             "Golang:go:engine/core.go"
             "Rust:rs:src/memory.rs"
             "Python:py:scripts/ml_pipeline.py"
             "JavaScript:js:ui/app.js"
+            "PHP:php:backend/api.php"
+            "TypeScript:ts:frontend/utils.ts"
+            "C++:cpp:core/engine.cpp"
+            "Java:java:src/main/App.java"
+            "Shell:sh:scripts/deploy.sh"
+            "Ruby:rb:lib/parser.rb"
+            "C#:cs:services/Auth.cs"
+            "Swift:swift:ios/App.swift"
+            "Kotlin:kt:android/MainActivity.kt"
           )
           RANDOM_TARGET="${SPOOF_TARGETS[$RANDOM % ${#SPOOF_TARGETS[@]}]}"
           LANG_NAME=$(echo "$RANDOM_TARGET" | cut -d: -f1)
           FILE_PATH=$(echo "$RANDOM_TARGET" | cut -d: -f3)
           
           SAFE_TIME=$(date +'%s')
-          BRANCH_NAME="feature/${LANG_NAME,,}-update-$SAFE_TIME"
+          
+          # Format the branch name cleanly (removing special characters like ++ or #)
+          CLEAN_LANG=$(echo "$LANG_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/+//g; s/#//g')
+          BRANCH_NAME="feature/${CLEAN_LANG}-update-$SAFE_TIME"
           
           git checkout -b "$BRANCH_NAME"
 
@@ -112,7 +123,13 @@ jobs:
             fi
             
             mkdir -p "$(dirname "$FILE_PATH")"
-            echo "// Auto-sync $TIMESTAMP" >> "$FILE_PATH"
+            
+            # Use appropriate comment syntax based on the language
+            if [[ "$LANG_NAME" == "Python" || "$LANG_NAME" == "Ruby" || "$LANG_NAME" == "Shell" ]]; then
+              echo "# Auto-sync $TIMESTAMP" >> "$FILE_PATH"
+            else
+              echo "// Auto-sync $TIMESTAMP" >> "$FILE_PATH"
+            fi
             
             echo "### 🤖 Auto-Commit Log #$STREAK" >> BOT_ACTIVITY.md
             echo "*📅 $TIMESTAMP*" >> BOT_ACTIVITY.md
@@ -135,15 +152,12 @@ jobs:
           done
 
           # 8. GitHub CLI Pull Request Strategy
-          # Push the new feature branch up to GitHub first
           git push -u origin "$BRANCH_NAME"
           
-          # Create the Pull Request using gh CLI
           gh pr create \
             --title "✨ feat: $LANG_NAME integration updates" \
             --body "Automated daily sync and puzzle generation for $LANG_NAME. Review streak: **$STREAK**" \
             --head "$BRANCH_NAME" \
             --base "$DEFAULT_BRANCH"
           
-          # Instantly merge the PR and auto-delete the remote branch to keep the repo clean
           gh pr merge "$BRANCH_NAME" --merge --delete-branch
