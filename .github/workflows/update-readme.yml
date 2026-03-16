@@ -2,7 +2,6 @@ name: Update README
 
 on:
   workflow_dispatch:
-  # This listens for your main bot to finish, then triggers automatically!
   workflow_run:
     workflows: ["Auto Commit"]
     types:
@@ -32,35 +31,19 @@ jobs:
           
           TIMESTAMP=$(date +'%B %d, %Y at %I:%M %p')
 
-          # 2. Build the README using a Heredoc
-          cat <<EOF > README.md
-# 👋 Skiddle's Automaton & Workspace
-
-Welcome to my active workspace. This repository is maintained by a highly caffeinated, automated bot that loves daily chess puzzles, programming jokes, and simulating branch activity.
-
-### 🤖 Bot Status
-* ⚡ **Lifetime Auto-Commits:** $STREAK
-* ⏱️ **Last Sync:** $TIMESTAMP
-* 📜 **Activity Log:** Check out [BOT_ACTIVITY.md](./BOT_ACTIVITY.md) for today's data dump.
-
----
-
-### 💻 The Human Behind the Bot
-I am a Software Engineer working across modern infrastructure and backend systems.
-
-**Current Focus & Projects:**
-* ♟️ **Axon:** Developing a Machine Learning-powered chess engine.
-* 🌐 **Specter:** A domain status monitoring system.
-* 🎨 **Paper Pulse:** Creative duo project.
-
-**Core Tech Stack:**
-* **Languages:** Golang, Python, Rust, JavaScript, PHP (Laravel)
-* **Infra & DevOps:** Docker, Kubernetes, Ansible, Proxmox
-* **Tools:** Git, PostgreSQL
-
----
-*This README is auto-generated and updated dynamically via GitHub Actions.*
-EOF
+          # 2. Build the README safely using echo to avoid YAML parsing errors
+          echo "# 🤖 Auto-Commit Bot Workspace" > README.md
+          echo "" >> README.md
+          echo "Welcome to this active workspace. This repository is maintained by an automated bot that loves daily chess puzzles, programming jokes, and simulating branch activity." >> README.md
+          echo "" >> README.md
+          echo "### 📊 Bot Status" >> README.md
+          echo "* ⚡ **Lifetime Auto-Commits:** $STREAK" >> README.md
+          echo "* ⏱️ **Last Sync:** $TIMESTAMP" >> README.md
+          echo "* 📜 **Activity Log:** Check out [BOT_ACTIVITY.md](./BOT_ACTIVITY.md) for the latest data dump." >> README.md
+          echo "" >> README.md
+          echo "***" >> README.md
+          echo "" >> README.md
+          echo "*This README is auto-generated and updated dynamically via GitHub Actions.*" >> README.md
 
       - name: Commit and Push README
         run: |
