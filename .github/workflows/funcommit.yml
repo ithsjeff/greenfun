@@ -1,4 +1,4 @@
-name: Fun Commit
+name: Auto Commit
 
 on:
   workflow_dispatch:
@@ -73,7 +73,6 @@ jobs:
           fi
 
           # 5. Initialize Streak Counter
-          # Creates a hidden file to track lifetime commits if it doesn't exist
           if [ ! -f .bot_streak ]; then echo 0 > .bot_streak; fi
           STREAK=$(cat .bot_streak)
 
@@ -82,13 +81,13 @@ jobs:
           do
             sleep 2
             
-            # Increment and save streak
+            # Increment streak
             STREAK=$((STREAK + 1))
             echo $STREAK > .bot_streak
             
             TIMESTAMP=$(date +'%Y-%m-%dT%H:%M:%S %Z')
             
-            # Fetch with built-in curl retries (-sfSL --retry 3 ensures it tries hard before failing)
+            # Fetch APIs with retries
             JOKE=$(curl -sfSL -m 10 --retry 3 "https://v2.jokeapi.dev/joke/Programming?format=txt&type=single" || echo "Code is like humor. When you have to explain it, it’s bad.")
             FACT=$(curl -sfSL -m 10 --retry 3 "https://uselessfacts.jsph.pl/api/v2/facts/random" | jq -r '.text' || echo "The server forgot its fun fact for today.")
             
@@ -96,22 +95,29 @@ jobs:
             PUZZLE_RES=$(curl -sfSL -m 10 --retry 3 "https://lichess.org/api/puzzle/daily" || echo "")
             PUZZLE_ID=$(echo "$PUZZLE_RES" | jq -r '.puzzle.id // empty')
             if [ -n "$PUZZLE_ID" ]; then
-              PUZZLE_TEXT="**Daily Chess Puzzle:** [Solve Puzzle $PUZZLE_ID](https://lichess.org/training/$PUZZLE_ID)"
+              PUZZLE_TEXT="[Solve Puzzle $PUZZLE_ID](https://lichess.org/training/$PUZZLE_ID)"
             else
-              PUZZLE_TEXT="**Daily Chess Puzzle:** Checkmate. API unavailable."
+              PUZZLE_TEXT="Checkmate. API unavailable."
             fi
             
-            # Append everything to the log
-            echo "### Commit at $TIMESTAMP | 🤖 Lifetime Commits: $STREAK" >> BOT_ACTIVITY.md
-            echo "$PUZZLE_TEXT" >> BOT_ACTIVITY.md
-            echo "**Random Fact:** $FACT" >> BOT_ACTIVITY.md
-            echo "> $JOKE" >> BOT_ACTIVITY.md
-            echo "---" >> BOT_ACTIVITY.md
+            # Append everything to the log using a clean Heredoc
+            cat <<EOF >> BOT_ACTIVITY.md
+### 🤖 Auto-Commit Log #$STREAK
+*📅 $TIMESTAMP*
+
+* ♟️ **Daily Chess Puzzle:** $PUZZLE_TEXT
+* 🧠 **Fact of the Day:** $FACT
+
+**💻 Dev Humor:**
+> $JOKE
+
+---
+EOF
             
-            # Log Rotation: Keep only the last 300 lines to prevent infinite growth
+            # Log Rotation: Keep only the last 300 lines
             tail -n 300 BOT_ACTIVITY.md > temp_log.md && mv temp_log.md BOT_ACTIVITY.md
             
-            # Stage both the markdown file and the hidden streak tracker
+            # Stage both files
             git add BOT_ACTIVITY.md .bot_streak
             
             # Fetch random commit message securely
