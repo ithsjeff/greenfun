@@ -100,19 +100,18 @@ jobs:
               PUZZLE_TEXT="Checkmate. API unavailable."
             fi
             
-            # Append everything to the log using a clean Heredoc
-            cat <<EOF >> BOT_ACTIVITY.md
-### 🤖 Auto-Commit Log #$STREAK
-*📅 $TIMESTAMP*
-
-* ♟️ **Daily Chess Puzzle:** $PUZZLE_TEXT
-* 🧠 **Fact of the Day:** $FACT
-
-**💻 Dev Humor:**
-> $JOKE
-
----
-EOF
+            # Append everything to the log safely without breaking YAML
+            echo "### 🤖 Auto-Commit Log #$STREAK" >> BOT_ACTIVITY.md
+            echo "*📅 $TIMESTAMP*" >> BOT_ACTIVITY.md
+            echo "" >> BOT_ACTIVITY.md
+            echo "* ♟️ **Daily Chess Puzzle:** $PUZZLE_TEXT" >> BOT_ACTIVITY.md
+            echo "* 🧠 **Fact of the Day:** $FACT" >> BOT_ACTIVITY.md
+            echo "" >> BOT_ACTIVITY.md
+            echo "**💻 Dev Humor:**" >> BOT_ACTIVITY.md
+            echo "> $JOKE" >> BOT_ACTIVITY.md
+            echo "" >> BOT_ACTIVITY.md
+            echo "***" >> BOT_ACTIVITY.md
+            echo "" >> BOT_ACTIVITY.md
             
             # Log Rotation: Keep only the last 300 lines
             tail -n 300 BOT_ACTIVITY.md > temp_log.md && mv temp_log.md BOT_ACTIVITY.md
