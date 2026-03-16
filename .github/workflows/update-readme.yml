@@ -1,0 +1,77 @@
+name: Update README
+
+on:
+  workflow_dispatch:
+  # This listens for your main bot to finish, then triggers automatically!
+  workflow_run:
+    workflows: ["Auto Commit"]
+    types:
+      - completed
+
+jobs:
+  update_readme:
+    runs-on: ubuntu-latest
+    env:
+      TZ: 'Asia/Phnom_Penh'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Generate Dynamic README
+        run: |
+          # 1. Grab the latest bot streak
+          STREAK=0
+          if [ -f .bot_streak ]; then 
+            STREAK=$(cat .bot_streak)
+          fi
+          
+          TIMESTAMP=$(date +'%B %d, %Y at %I:%M %p')
+
+          # 2. Build the README using a Heredoc
+          cat <<EOF > README.md
+# 👋 Skiddle's Automaton & Workspace
+
+Welcome to my active workspace. This repository is maintained by a highly caffeinated, automated bot that loves daily chess puzzles, programming jokes, and simulating branch activity.
+
+### 🤖 Bot Status
+* ⚡ **Lifetime Auto-Commits:** $STREAK
+* ⏱️ **Last Sync:** $TIMESTAMP
+* 📜 **Activity Log:** Check out [BOT_ACTIVITY.md](./BOT_ACTIVITY.md) for today's data dump.
+
+---
+
+### 💻 The Human Behind the Bot
+I am a Software Engineer working across modern infrastructure and backend systems.
+
+**Current Focus & Projects:**
+* ♟️ **Axon:** Developing a Machine Learning-powered chess engine.
+* 🌐 **Specter:** A domain status monitoring system.
+* 🎨 **Paper Pulse:** Creative duo project.
+
+**Core Tech Stack:**
+* **Languages:** Golang, Python, Rust, JavaScript, PHP (Laravel)
+* **Infra & DevOps:** Docker, Kubernetes, Ansible, Proxmox
+* **Tools:** Git, PostgreSQL
+
+---
+*This README is auto-generated and updated dynamically via GitHub Actions.*
+EOF
+
+      - name: Commit and Push README
+        run: |
+          git config --local user.email "iths003.hsgroup@gmail.com"
+          git config --local user.name "ithsjeff"
+          
+          # Only commit if the README actually changed to avoid empty commit errors
+          if [[ -n $(git status --porcelain README.md) ]]; then
+            git add README.md
+            git commit -m "docs: 📝 dynamic README update"
+            git push
+          else
+            echo "README is already up to date. Skipping commit."
+          fi
