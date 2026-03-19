@@ -75,7 +75,7 @@ jobs:
           if [ ! -f .bot_streak ]; then echo 0 > .bot_streak; fi
           STREAK=$(cat .bot_streak)
           
-          # 6. Setup Language & Branch Spoofing (EXPANDED LIST)
+          # 6. Setup Language & Branch Spoofing
           SPOOF_TARGETS=(
             "Golang:go:engine/core.go"
             "Rust:rs:src/memory.rs"
@@ -97,7 +97,7 @@ jobs:
           
           SAFE_TIME=$(date +'%s')
           
-          # Format the branch name cleanly (removing special characters like ++ or #)
+          # Format the branch name cleanly
           CLEAN_LANG=$(echo "$LANG_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/+//g; s/#//g')
           BRANCH_NAME="feature/${CLEAN_LANG}-update-$SAFE_TIME"
           
@@ -124,26 +124,36 @@ jobs:
             
             mkdir -p "$(dirname "$FILE_PATH")"
             
-            # Use appropriate comment syntax based on the language
+            # Use appropriate comment syntax
             if [[ "$LANG_NAME" == "Python" || "$LANG_NAME" == "Ruby" || "$LANG_NAME" == "Shell" ]]; then
               echo "# Auto-sync $TIMESTAMP" >> "$FILE_PATH"
             else
               echo "// Auto-sync $TIMESTAMP" >> "$FILE_PATH"
             fi
             
-            echo "### 🤖 Auto-Commit Log #$STREAK" >> BOT_ACTIVITY.md
-            echo "*📅 $TIMESTAMP*" >> BOT_ACTIVITY.md
-            echo "" >> BOT_ACTIVITY.md
-            echo "* ♟️ **Daily Chess Puzzle:** $PUZZLE_TEXT" >> BOT_ACTIVITY.md
-            echo "* 🧠 **Fact of the Day:** $FACT" >> BOT_ACTIVITY.md
-            echo "" >> BOT_ACTIVITY.md
-            echo "**💻 Dev Humor:**" >> BOT_ACTIVITY.md
-            echo "> $JOKE" >> BOT_ACTIVITY.md
-            echo "" >> BOT_ACTIVITY.md
-            echo "***" >> BOT_ACTIVITY.md
-            echo "" >> BOT_ACTIVITY.md
+            # Write the NEW entry to a temporary file first
+            echo "### 🤖 Auto-Commit Log #$STREAK" > new_entry.md
+            echo "*📅 $TIMESTAMP*" >> new_entry.md
+            echo "" >> new_entry.md
+            echo "* ♟️ **Daily Chess Puzzle:** $PUZZLE_TEXT" >> new_entry.md
+            echo "* 🧠 **Fact of the Day:** $FACT" >> new_entry.md
+            echo "" >> new_entry.md
+            echo "**💻 Dev Humor:**" >> new_entry.md
+            echo "> $JOKE" >> new_entry.md
+            echo "" >> new_entry.md
+            echo "***" >> new_entry.md
+            echo "" >> new_entry.md
             
-            tail -n 300 BOT_ACTIVITY.md > temp_log.md && mv temp_log.md BOT_ACTIVITY.md
+            # If the log already exists, append the old content BELOW the new entry
+            if [ -f BOT_ACTIVITY.md ]; then
+              cat BOT_ACTIVITY.md >> new_entry.md
+            fi
+            
+            # Replace the original log with the new combined file
+            mv new_entry.md BOT_ACTIVITY.md
+            
+            # Log Rotation: Keep only the FIRST (newest) 300 lines using 'head'
+            head -n 300 BOT_ACTIVITY.md > temp_log.md && mv temp_log.md BOT_ACTIVITY.md
             
             git add BOT_ACTIVITY.md .bot_streak "$FILE_PATH"
             
